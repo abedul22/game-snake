@@ -1,0 +1,476 @@
+<!doctype html>
+<html lang="id">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>Snake Game — Neon Arcade</title>
+  <style>
+    /* ===== Reset & layout ===== */
+    *{box-sizing:border-box;margin:0;padding:0}
+    html,body{height:100%;font-family:Inter,ui-sans-serif,system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial; background:#071018;color:#e6f6ff}
+    .app{min-height:100%;display:flex;align-items:center;justify-content:center;padding:20px}
+    .card{width:100%;max-width:920px;background:linear-gradient(180deg, rgba(255,255,255,0.02), rgba(0,0,0,0.06));border-radius:12px;padding:18px;box-shadow:0 8px 30px rgba(2,6,23,0.6)}
+
+    /* ===== Header ===== */
+    .topbar{display:flex;gap:12px;align-items:center;justify-content:space-between;margin-bottom:12px}
+    .title{display:flex;gap:12px;align-items:center}
+    .logo{width:44px;height:44px;border-radius:8px;background:linear-gradient(135deg,#00ff99,#00d4ff);display:flex;align-items:center;justify-content:center;font-weight:700;color:#02111a}
+    h1{font-size:18px}
+    .controls{display:flex;gap:8px;align-items:center}
+
+    /* ===== Canvas container ===== */
+    .game-wrap{display:flex;gap:14px;align-items:flex-start}
+    .viewport{background:linear-gradient(180deg,#03111a 0%, #04121b 100%);padding:12px;border-radius:10px;flex:1;display:flex;flex-direction:column;align-items:center}
+    canvas{background:transparent;border-radius:6px;display:block;touch-action:none}
+
+    /* ===== HUD ===== */
+    .hud{display:flex;gap:10px;align-items:center;justify-content:center;margin-bottom:10px}
+    .score{font-weight:700;padding:6px 12px;border-radius:999px;backdrop-filter:blur(6px);background:rgba(255,255,255,0.03);border:1px solid rgba(255,255,255,0.03)}
+    .btn{background:transparent;border:1px solid rgba(255,255,255,0.06);padding:8px 12px;border-radius:8px;cursor:pointer}
+    .btn.primary{background:linear-gradient(90deg,#00ff99,#00d4ff);color:#021; border:none}
+
+    /* ===== Sidebar ===== */
+    .sidebar{width:240px;min-width:200px;display:flex;flex-direction:column;gap:10px}
+    .panel{padding:12px;border-radius:10px;background:linear-gradient(180deg, rgba(255,255,255,0.02), rgba(0,0,0,0.03));}
+    .small{font-size:13px;color:#a7d8ff}
+
+    /* ===== Mobile touch controls ===== */
+    .touch-controls{display:none;gap:8px;justify-content:center;margin-top:10px}
+    .touch-button{width:56px;height:56px;border-radius:12px;background:rgba(255,255,255,0.03);display:flex;align-items:center;justify-content:center;font-size:20px;user-select:none}
+
+    /* ===== Responsiveness ===== */
+    @media (max-width:880px){
+      .game-wrap{flex-direction:column}
+      .sidebar{width:100%}
+      .touch-controls{display:flex}
+      .sidebar{order:2}
+    }
+
+    /* ===== Neon glow helpers ===== */
+    .neon{box-shadow:0 6px 20px rgba(0,255,153,0.08),0 2px 8px rgba(0,212,255,0.04)}
+
+  </style>
+</head>
+<body>
+  <div class="app">
+    <div class="card">
+      <div class="topbar">
+        <div class="title">
+          <div class="logo">S</div>
+          <div>
+            <h1>Snake — Neon Arcade</h1>
+            <div class="small">Arcade minimalis • Canvas API • Responsive</div>
+          </div>
+        </div>
+
+        <div class="controls">
+          <div class="score" id="scoreDisplay">Score: 0</div>
+          <button class="btn" id="modeToggle">Mode: Neon</button>
+          <button class="btn primary" id="startBtn">Mulai</button>
+        </div>
+      </div>
+
+      <div class="game-wrap">
+        <div class="viewport">
+          <div class="hud">
+            <div class="small">Level: <span id="levelDisplay">1</span></div>
+            <div class="small">Kecepatan: <span id="speedDisplay">5</span></div>
+          </div>
+
+          <canvas id="gameCanvas" width="640" height="640" aria-label="Snake game canvas"></canvas>
+
+          <!-- Mobile touch controls -->
+          <div class="touch-controls" id="touchControls">
+            <div style="display:flex;flex-direction:column;gap:8px;align-items:center">
+              <div class="touch-button" data-dir="up">▲</div>
+              <div style="display:flex;gap:8px;align-items:center">
+                <div class="touch-button" data-dir="left">◀</div>
+                <div style="width:56px"></div>
+                <div class="touch-button" data-dir="right">▶</div>
+              </div>
+              <div class="touch-button" data-dir="down">▼</div>
+            </div>
+          </div>
+
+        </div>
+
+        <div class="sidebar">
+          <div class="panel">
+            <h3 style="margin-bottom:8px">Instruksi</h3>
+            <div class="small">Gunakan panah / WASD untuk mengontrol ular. Di mobile, pakai tombol sentuh di bawah kanvas.</div>
+            <hr style="margin:8px 0;border:none;border-top:1px solid rgba(255,255,255,0.03)">
+            <div class="small">Fitur:
+              <ul style="margin-top:8px;line-height:1.6">
+                <li>Grid halus di background</li>
+                <li>Ular neon & makanan bulat</li>
+                <li>Skor, level, kecepatan</li>
+                <li>Suara makan & game over (WebAudio)</li>
+              </ul>
+            </div>
+          </div>
+
+          <div class="panel">
+            <h3 style="margin-bottom:8px">Pengaturan</h3>
+            <div style="display:flex;gap:8px;margin-bottom:8px">
+              <label class="small">Ukuran grid:
+                <select id="gridSize" style="margin-left:6px;padding:6px;border-radius:6px;background:transparent;border:1px solid rgba(255,255,255,0.04);">
+                  <option value="16">16</option>
+                  <option value="20" selected>20</option>
+                  <option value="24">24</option>
+                </select>
+              </label>
+            </div>
+            <div style="display:flex;gap:8px;align-items:center">
+              <label class="small">Suara: <input type="checkbox" id="soundToggle" checked style="margin-left:6px"></label>
+            </div>
+          </div>
+
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    // ===========================
+    // Snake Game — Neon Arcade
+    // Single-file HTML/CSS/JS
+    // Comments included for easy understanding
+    // ===========================
+
+    // Grab DOM
+    const canvas = document.getElementById('gameCanvas');
+    const ctx = canvas.getContext('2d');
+    const startBtn = document.getElementById('startBtn');
+    const scoreDisplay = document.getElementById('scoreDisplay');
+    const levelDisplay = document.getElementById('levelDisplay');
+    const speedDisplay = document.getElementById('speedDisplay');
+    const gridSizeSelect = document.getElementById('gridSize');
+    const modeToggle = document.getElementById('modeToggle');
+    const touchControls = document.getElementById('touchControls');
+    const soundToggle = document.getElementById('soundToggle');
+
+    // Game state
+    let GRID = parseInt(gridSizeSelect.value,10); // number of cells per side
+    let CELL = canvas.width / GRID;                 // pixel size of each cell
+    let snake = [];        // array of {x,y}
+    let dir = {x:1,y:0};   // current movement direction
+    let nextDir = null;    // buffer next direction to avoid reversing
+    let food = null;       // food position
+    let score = 0;
+    let level = 1;
+    let baseSpeed = 5;     // ticks per second
+    let speed = baseSpeed;
+    let running = false;
+    let lastTick = 0;
+    let cellPadding = 2;   // padding inside cell for nicer look
+    let neonMode = true;
+
+    // Audio: simple WebAudio beep generator
+    const audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+    function beep(frequency=440, duration=0.08, type='sine', gain=0.12){
+      if(!soundToggle.checked) return;
+      const o = audioCtx.createOscillator();
+      const g = audioCtx.createGain();
+      o.type = type; o.frequency.value = frequency;
+      g.gain.value = gain;
+      o.connect(g); g.connect(audioCtx.destination);
+      o.start();
+      g.gain.exponentialRampToValueAtTime(0.0001, audioCtx.currentTime + duration);
+      setTimeout(()=>o.stop(), duration*1000 + 20);
+    }
+
+    // Utility: random integer in range [0,n)
+    function rnd(n){return Math.floor(Math.random()*n)}
+
+    // Initialize (reset) game
+    function resetGame(){
+      GRID = parseInt(gridSizeSelect.value,10);
+      CELL = canvas.width / GRID;
+      snake = [];
+      const sx = Math.floor(GRID/2), sy = Math.floor(GRID/2);
+      snake.push({x:sx,y:sy});
+      snake.push({x:sx-1,y:sy});
+      snake.push({x:sx-2,y:sy});
+      dir = {x:1,y:0}; nextDir = null;
+      placeFood();
+      score = 0; level = 1; speed = baseSpeed; running = false;
+      updateHUD();
+      draw();
+    }
+
+    // Place food in an empty cell
+    function placeFood(){
+      let tries = 0;
+      while(true){
+        const fx = rnd(GRID), fy = rnd(GRID);
+        if(!snake.some(s=>s.x===fx && s.y===fy)){
+          food = {x:fx,y:fy};
+          return;
+        }
+        if(++tries>1000) break;
+      }
+    }
+
+    // Start or restart
+    function startGame(){
+      if(!running){
+        running = true;
+        lastTick = performance.now();
+        // resume audio context on user gesture
+        if(audioCtx.state==='suspended') audioCtx.resume();
+        window.requestAnimationFrame(loop);
+      } else {
+        resetGame();
+        running = true;
+        lastTick = performance.now();
+        window.requestAnimationFrame(loop);
+      }
+    }
+
+    // Game loop (using requestAnimationFrame) + tick control by speed
+    function loop(now){
+      const msPerTick = 1000 / speed;
+      if(!running) return;
+      if(now - lastTick >= msPerTick){
+        lastTick = now;
+        tick();
+      }
+      draw();
+      window.requestAnimationFrame(loop);
+    }
+
+    // Tick: update game logic
+    function tick(){
+      // Apply buffered direction if valid (prevent reversing)
+      if(nextDir){
+        if(!(nextDir.x === -dir.x && nextDir.y === -dir.y)) dir = nextDir;
+        nextDir = null;
+      }
+
+      // New head
+      const head = {x:snake[0].x + dir.x, y:snake[0].y + dir.y};
+
+      // Wrap-around behavior (comment out for wall-collision)
+      if(head.x < 0) head.x = GRID - 1;
+      if(head.x >= GRID) head.x = 0;
+      if(head.y < 0) head.y = GRID - 1;
+      if(head.y >= GRID) head.y = 0;
+
+      // Collision with self -> game over
+      if(snake.some(s => s.x===head.x && s.y===head.y)){
+        gameOver();
+        return;
+      }
+
+      snake.unshift(head);
+
+      // Eating food
+      if(food && head.x===food.x && head.y===food.y){
+        score += 10;
+        beep(880,0.06,'square',0.18); // eat sound
+        placeFood();
+        // increase level & speed every 50 points
+        level = Math.floor(score/50) + 1;
+        speed = baseSpeed + (level-1)*1.5;
+        updateHUD();
+      } else {
+        snake.pop(); // move: remove tail
+      }
+    }
+
+    // Game over
+    function gameOver(){
+      running = false;
+      beep(180,0.5,'sawtooth',0.2); // game over longer beep
+      // show restart UI
+      startBtn.textContent = 'Mulai Ulang';
+      // simple flashing effect: draw final frame then overlay
+      draw();
+      // overlay message
+      ctx.save();
+      ctx.fillStyle = 'rgba(0,0,0,0.5)';
+      ctx.fillRect(0,0,canvas.width,canvas.height);
+      ctx.restore();
+      // small text
+      ctx.fillStyle = '#fff';
+      ctx.font = '28px system-ui';
+      ctx.textAlign = 'center';
+      ctx.fillText('Game Over', canvas.width/2, canvas.height/2 - 8);
+      ctx.font = '16px system-ui';
+      ctx.fillText('Klik Mulai Ulang untuk bermain lagi', canvas.width/2, canvas.height/2 + 20);
+    }
+
+    // Update HUD elements
+    function updateHUD(){
+      scoreDisplay.textContent = `Score: ${score}`;
+      levelDisplay.textContent = `${level}`;
+      speedDisplay.textContent = `${Math.round(speed*10)/10}`;
+    }
+
+    // Drawing utilities
+    function clear(){
+      ctx.clearRect(0,0,canvas.width,canvas.height);
+    }
+
+    // Draw grid background and subtle neon glow
+    function drawBackground(){
+      // dark base
+      ctx.fillStyle = '#03151a';
+      ctx.fillRect(0,0,canvas.width,canvas.height);
+
+      // thin grid lines
+      ctx.strokeStyle = 'rgba(255,255,255,0.02)';
+      ctx.lineWidth = 1;
+      for(let i=0;i<=GRID;i++){
+        const p = Math.round(i*CELL)+0.5;
+        ctx.beginPath(); ctx.moveTo(p,0); ctx.lineTo(p,canvas.height); ctx.stroke();
+        ctx.beginPath(); ctx.moveTo(0,p); ctx.lineTo(canvas.width,p); ctx.stroke();
+      }
+
+      // center subtle vignette
+      const g = ctx.createRadialGradient(canvas.width/2,canvas.height/2,10,canvas.width/2,canvas.height/2,canvas.width);
+      g.addColorStop(0,'rgba(255,255,255,0.02)');
+      g.addColorStop(1,'rgba(0,0,0,0.35)');
+      ctx.fillStyle = g;
+      ctx.fillRect(0,0,canvas.width,canvas.height);
+    }
+
+    // Draw snake as neon squares with inner shading
+    function drawSnake(){
+      for(let i=0;i<snake.length;i++){
+        const s = snake[i];
+        const x = s.x*CELL, y = s.y*CELL;
+        // color gradient along body
+        const t = i / Math.max(1,snake.length-1);
+        const hue = 150 - t*30; // greenish to yellowish
+        // body glow
+        if(neonMode){
+          ctx.shadowBlur = 14; ctx.shadowColor = `hsla(${hue},100%,50%,0.35)`;
+        } else {ctx.shadowBlur = 0}
+        ctx.fillStyle = `hsl(${hue},100%,45%)`;
+        roundRect(ctx, x+cellPadding, y+cellPadding, CELL - cellPadding*2, CELL - cellPadding*2, 6, true, false);
+        ctx.shadowBlur = 0;
+        // head accent
+        if(i===0){
+          ctx.fillStyle = 'rgba(255,255,255,0.12)';
+          roundRect(ctx, x+CELL*0.18, y+CELL*0.18, CELL*0.24, CELL*0.24, 3, true, false);
+          roundRect(ctx, x+CELL*0.58, y+CELL*0.18, CELL*0.24, CELL*0.24, 3, true, false);
+        }
+      }
+    }
+
+    // Draw food as glowing circle
+    function drawFood(){
+      if(!food) return;
+      const cx = food.x*CELL + CELL/2;
+      const cy = food.y*CELL + CELL/2;
+      const r = CELL*0.36;
+      const grad = ctx.createRadialGradient(cx,cy,r*0.2,cx,cy,r);
+      grad.addColorStop(0,'#ffd8a6');
+      grad.addColorStop(0.4,'#ff6b3d');
+      grad.addColorStop(1,'rgba(255,100,60,0.1)');
+      if(neonMode){ ctx.shadowBlur = 18; ctx.shadowColor = 'rgba(255,120,60,0.35)'; }
+      ctx.beginPath(); ctx.fillStyle = grad; ctx.arc(cx,cy,r,0,Math.PI*2); ctx.fill(); ctx.shadowBlur = 0;
+    }
+
+    // Utility: rounded rectangle path + fill
+    function roundRect(ctx, x, y, w, h, r, fill, stroke){
+      if(typeof r === 'number') r = {tl:r,tr:r,br:r,bl:r};
+      ctx.beginPath();
+      ctx.moveTo(x + r.tl, y);
+      ctx.lineTo(x + w - r.tr, y);
+      ctx.quadraticCurveTo(x + w, y, x + w, y + r.tr);
+      ctx.lineTo(x + w, y + h - r.br);
+      ctx.quadraticCurveTo(x + w, y + h, x + w - r.br, y + h);
+      ctx.lineTo(x + r.bl, y + h);
+      ctx.quadraticCurveTo(x, y + h, x, y + h - r.bl);
+      ctx.lineTo(x, y + r.tl);
+      ctx.quadraticCurveTo(x, y, x + r.tl, y);
+      ctx.closePath();
+      if(fill) ctx.fill();
+      if(stroke) ctx.stroke();
+    }
+
+    // Full draw
+    function draw(){
+      clear();
+      drawBackground();
+      drawFood();
+      drawSnake();
+    }
+
+    // Input handling
+    window.addEventListener('keydown', e=>{
+      const code = e.key;
+      if(code==='ArrowUp' || code==='w' || code==='W') setDir(0,-1);
+      if(code==='ArrowDown' || code==='s' || code==='S') setDir(0,1);
+      if(code==='ArrowLeft' || code==='a' || code==='A') setDir(-1,0);
+      if(code==='ArrowRight' || code==='d' || code==='D') setDir(1,0);
+      // space to restart
+      if(code===' '){ if(!running) startGame(); }
+    });
+
+    function setDir(x,y){
+      // buffer direction so that two quick presses don't reverse
+      if(nextDir) return nextDir = {x,y};
+      nextDir = {x,y};
+    }
+
+    // Touch controls binding
+    touchControls.addEventListener('pointerdown', e=>{
+      const btn = e.target.closest('.touch-button');
+      if(!btn) return;
+      const d = btn.dataset.dir;
+      if(d==='up') setDir(0,-1);
+      if(d==='down') setDir(0,1);
+      if(d==='left') setDir(-1,0);
+      if(d==='right') setDir(1,0);
+      // simple haptic feedback when available
+      if(navigator.vibrate) navigator.vibrate(15);
+    });
+
+    // Canvas resize to keep square & responsive
+    function fitCanvas(){
+      const rect = canvas.getBoundingClientRect();
+      const size = Math.min(rect.width, window.innerHeight*0.7);
+      canvas.width = size; canvas.height = size;
+      CELL = canvas.width / GRID;
+      draw();
+    }
+    window.addEventListener('resize', fitCanvas);
+
+    // UI bindings
+    startBtn.addEventListener('click', ()=>{
+      if(running) { resetGame(); startGame(); }
+      else { startGame(); startBtn.textContent = 'Mulai'; }
+    });
+
+    gridSizeSelect.addEventListener('change', ()=>{
+      resetGame();
+    });
+
+    modeToggle.addEventListener('click', ()=>{
+      neonMode = !neonMode;
+      modeToggle.textContent = `Mode: ${neonMode? 'Neon' : 'Flat'}`;
+      draw();
+    });
+
+    soundToggle.addEventListener('change', ()=>{
+      // no UI change needed; beep checks the toggle
+    });
+
+    // Prevent scrolling on touch while interacting with canvas
+    canvas.addEventListener('touchstart', e=>{e.preventDefault();});
+
+    // Start with initial setup
+    resetGame();
+    fitCanvas();
+
+    // Ensure a first tap will allow audioContext to play on some browsers
+    document.body.addEventListener('pointerdown',()=>{
+      if(audioCtx.state==='suspended') audioCtx.resume();
+    }, {once:true});
+
+  </script>
+</body>
+</html>
